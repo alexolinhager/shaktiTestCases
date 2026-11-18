@@ -31,8 +31,9 @@ if any(steps==2)
 	% Typical bed bump bump spacing (2m)
 	md.hydrology.bump_spacing = 2*ones(md.mesh.numberofelements,1);
 
-	% Typical bed bump height (0.1m)
-	md.hydrology.bump_height = 0.1*ones(md.mesh.numberofelements,1);
+	% Typical bed bump height (0.0m) – Standard is to run without cavity
+    % opening with sliding
+	md.hydrology.bump_height = 0.0*ones(md.mesh.numberofelements,1);
 
 	% Define distributed englacial input to the subglacial system (m/yr)
 	% Change the value 0.0 to add distributed input
