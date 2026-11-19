@@ -1,26 +1,33 @@
 import numpy as np
+from generic import generic
 from model import *
 from solve import solve
 from hydrologyshakti import hydrologyshakti
 from parameterize import parameterize
-from export_netCDF import export_netCDF
+from read_netCDF import read_netCDF
 from transient import transient
 from setmask import setmask
 from triangle import triangle
+from write_netCDF import write_netCDF
 
 
 steps = [1, 2, 3]
+
+# Number of processors: change it according to your machine, or set nproc
+# before running this script (as run/runTestCases.py does)
+if 'nproc' not in globals():
+    nproc = 2
 
 if 1 in steps:
     print('    Step 1: Mesh')
     #Generate unstructured mesh on 1, 000 m square with typical element edge length of 20 m
     md = triangle(model(), './outline.exp', 20)
-    export_netCDF(md, 'MoulinMesh.nc')
+    write_netCDF(md, 'MoulinMesh.nc')
 
 
 if 2 in steps:
     print('    Step 2: Parameterization')
-    md = loadmodel('MoulinMesh.nc')
+    md = read_netCDF('MoulinMesh.nc')
     md = setmask(md, '', '')
 
     # Run parameterization script to set up geometry, velocity, material properties, etc.
@@ -60,18 +67,17 @@ if 2 in steps:
     md.hydrology.reltol = 0.05
     md.hydrology.abstol = np.nan
 
-    export_netCDF(md, 'MoulinParam.nc')
+    write_netCDF(md, 'MoulinParam.nc')
 
 if 3 in steps:
     print('    Step 3: Solve!')
-    md = loadmodel('MoulinParam.nc')
+    md = read_netCDF('MoulinParam.nc')
 
     md.transient = transient.deactivateall(md.transient)
     md.transient.ishydrology = 1
 
     # Specify that you want to run the model on your current computer
-    # Change the number of processors according to your machine (here np = 4)
-    md.cluster = generic('np', 2)
+    md.cluster = generic('np', nproc)
 
     # Define the time stepping scheme: run for 90 days with a time step of 1 hr
     md.timestepping.time_step = 3600. / md.constants.yts  # Time step (in years)
@@ -93,4 +99,4 @@ if 3 in steps:
     md.verbose.solution = 1
     md = solve(md, 'Transient')
 
-    export_netCDF(md, 'MoulinTransient.nc')
+    write_netCDF(md, 'MoulinTransient.nc')
