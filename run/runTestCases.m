@@ -1,38 +1,47 @@
-function runTestCases(cases,np,resolution)
+function runTestCases(cases,np,rundir,resolution)
 %RUNTESTCASES - run SHAKTI test cases, then their diagnostics
 %
-%   For each test case, this runs runme.m and then diagnostics.m in the folder
-%   of the test case. Results (.mat files) are saved in that folder, and
-%   videos and figures in its 'diagnostics' subfolder.
+%   Nothing is written in the repository: each test case runs in its own
+%   subfolder of the run directory, <rundir>/<test case>. The scripts and
+%   input files of the test case are copied there, then runme.m and
+%   diagnostics.m are run there. Results (.mat files) are saved in that
+%   subfolder, and videos and figures in its 'diagnostics' subfolder.
 %
 %   Usage:
-%      runTestCases(cases,np)
-%      runTestCases(cases,np,resolution)
+%      runTestCases(cases,np,rundir)
+%      runTestCases(cases,np,rundir,resolution)
 %
 %      cases       'all', the name of one test case, or a cell array of names:
 %                     'singleMoulin'           (about 720 hourly time steps)
 %                     'helheimSeasonal'        (3 scenarios of 1 year)
 %                     'thwaitesInterventions'  (spin-up, capacity and 3 experiments)
 %      np          number of processors, used for all the runs
+%      rundir      run directory, created if needed (outside of the repository)
 %      resolution  'low' (default) or 'high': mesh of helheimSeasonal and
 %                  thwaitesInterventions (singleMoulin has one mesh only)
 %
 %   Examples:
-%      runTestCases('all',4)
-%      runTestCases('helheimSeasonal',8,'high')
-%      runTestCases({'singleMoulin','thwaitesInterventions'},2,'low')
+%      runTestCases('all',4,'~/shaktiRuns')
+%      runTestCases('helheimSeasonal',8,'/scratch/shaktiRuns','high')
+%      runTestCases({'singleMoulin','thwaitesInterventions'},2,'~/shaktiRuns','low')
 %
 %   From a terminal, in this folder:
-%      matlab -batch "runTestCases('all',4)"
+%      matlab -batch "runTestCases('all',4,'~/shaktiRuns')"
 
 	available={'singleMoulin','helheimSeasonal','thwaitesInterventions'};
 
+	% Input files of each test case, copied to the run directory with runme.m
+	% and diagnostics.m
+	inputs.singleMoulin={'moulin.par','outline.exp'};
+	inputs.helheimSeasonal={'merra2_runoff.mat','HelheimWinterSpinup_300m.mat','HelheimWinterSpinup_70m.mat'};
+	inputs.thwaitesInterventions={'TIS_island.exp','Thwaites_SHAKTI_init.mat','Thwaites_SHAKTI_init_500mto10km.mat'};
+
 	% Check inputs
-	if nargin<2
+	if nargin<3
 		help runTestCases
-		error('runTestCases: the test cases and the number of processors are required');
+		error('runTestCases: the test cases, the number of processors and the run directory are required');
 	end
-	if nargin<3, resolution='low'; end
+	if nargin<4, resolution='low'; end
 	if ischar(cases) || isstring(cases)
 		if strcmpi(cases,'all'), cases=available; else, cases=cellstr(cases); end
 	end
@@ -47,6 +56,20 @@ function runTestCases(cases,np,resolution)
 	if ~ismember(resolution,{'low','high'})
 		error('runTestCases: resolution should be ''low'' or ''high''');
 	end
+	if ~(ischar(rundir) || isstring(rundir)) || strlength(rundir)==0
+		error('runTestCases: rundir (run directory) should be the name of a directory');
+	end
+
+	% Run directory: absolute path, outside of the repository
+	root=fileparts(fileparts(mfilename('fullpath')));
+	rundir=char(rundir);
+	if strncmp(rundir,'~',1), rundir=[char(java.lang.System.getProperty('user.home')) rundir(2:end)]; end
+	if ~exist(rundir,'dir'), mkdir(rundir); end
+	rundir=cd(cd(rundir));
+	if strcmp(rundir,root) || strncmp(rundir,[root filesep],numel(root)+1)
+		error(['runTestCases: the run directory should be outside of the repository (' root ')']);
+	end
+	addpath(root); % shaktiDiagnostics.m
 
 	% ISSM: load its path if needed. ISSM_DIR is also needed to launch a run,
 	% and is not set when MATLAB was not started from a terminal
@@ -60,14 +83,19 @@ function runTestCases(cases,np,resolution)
 	if isempty(getenv('ISSM_DIR')), setenv('ISSM_DIR',issmdir()); end
 
 	% Run the test cases one after the other; if one fails, go on with the next
-	root=fileparts(fileparts(mfilename('fullpath')));
 	status=repmat({'done'},1,numel(cases));
 	elapsed=zeros(1,numel(cases));
 	for i=1:numel(cases)
-		fprintf('\n=== %s (np=%d, resolution=%s) ===\n',cases{i},np,resolution);
+		fprintf('\n=== %s (np=%d, resolution=%s) in %s ===\n',cases{i},np,resolution,fullfile(rundir,cases{i}));
 		start=tic;
 		try
-			runcase(fullfile(root,cases{i}),np,resolution);
+			folder=fullfile(rundir,cases{i});
+			if ~exist(folder,'dir'), mkdir(folder); end
+			files=[{'runme.m','diagnostics.m'} inputs.(cases{i})];
+			for j=1:numel(files)
+				copyfile(fullfile(root,cases{i},files{j}),folder);
+			end
+			runcase(folder,np,resolution);
 		catch me
 			status{i}='FAILED';
 			disp(getReport(me));
