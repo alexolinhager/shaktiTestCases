@@ -12,11 +12,12 @@
 %    'seasonal_firn'  seasonal runoff below 900 m + steady firn aquifer drainage
 %    'enhanced_melt'  doubled runoff below 1500 m + doubled firn aquifer drainage
 scenarios={'seasonal','seasonal_firn','enhanced_melt'};
+np = 2;
 
 for i=1:numel(scenarios)
 	scenario=scenarios{i};
 	disp(['Seasonal meltwater forcing and solve (' scenario ')']);
-	md=loadmodel('Helheim_SHAKTI_N_2_1yr_H10_300mto3km');
+	md=loadmodel('HelheimWinterSpinup_70m');
 
 	switch scenario
 		case 'seasonal',      melt_factor=1; melt_elevation=900;  firn_factor=0;
@@ -35,7 +36,7 @@ for i=1:numel(scenarios)
 
 	% Meltwater input rate (m/yr) from hourly 2018 MERRA-2 runoff near the
 	% terminus, starting on January 1st and going back to zero at the end of the year
-	runoff=load([path_to_datasets '/merra2_runoff.mat'],'ro2018');
+	runoff=load('merra2_runoff.mat','ro2018');
 	runoff=[runoff.ro2018(:); 0]';
 	runoff=melt_factor*interp1((0:numel(runoff)-1)/(numel(runoff)-1),runoff,time);
 
@@ -54,7 +55,7 @@ for i=1:numel(scenarios)
 
 	% Specify that you want to run the model on your current computer
 	% Change the number of processors according to your machine (here np=2)
-	md.cluster=generic('np',2);
+	md.cluster=generic('np',np);
 
 	md.miscellaneous.name=['Helheim_' scenario];
 	md.verbose.solution=1;
