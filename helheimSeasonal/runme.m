@@ -3,21 +3,31 @@
 % Sommers et al. (2024, https://doi.org/10.1029/2024GL109168, section 2.4.1).
 %
 % Unlike in the paper, the stress balance is not solved here: the ice velocity
-% stays at its winter value while the subglacial hydrology evolves. The mesh is
-% also coarser than in the paper (7,366 elements instead of 27,913).
+% stays at its winter value while the subglacial hydrology evolves.
 
 % Meltwater scenarios to run one after the other, each one starts from the
-% winter base state and is saved in Helheim_<scenario>.mat:
+% winter base state and is saved in Helheim_<scenario>_<resolution>.mat:
 %    'seasonal'       seasonal runoff below 900 m
 %    'seasonal_firn'  seasonal runoff below 900 m + steady firn aquifer drainage
 %    'enhanced_melt'  doubled runoff below 1500 m + doubled firn aquifer drainage
 scenarios={'seasonal','seasonal_firn','enhanced_melt'};
-np = 2;
+
+% Number of processors and mesh resolution: change them according to your
+% machine, or set np and resolution before running this script (as
+% run/runTestCases.m does)
+%    'low'   300 m to 3 km (7,366 elements)
+%    'high'  mesh of the paper (27,913 elements)
+if ~exist('np','var'), np=2; end
+if ~exist('resolution','var'), resolution='low'; end
 
 for i=1:numel(scenarios)
 	scenario=scenarios{i};
 	disp(['Seasonal meltwater forcing and solve (' scenario ')']);
-	md=loadmodel('HelheimWinterSpinup_70m');
+	switch resolution
+		case 'low',  md=loadmodel('HelheimWinterSpinup_300m');
+		case 'high', md=loadmodel('HelheimWinterSpinup_70m');
+		otherwise, error(['resolution ''' resolution ''' not supported']);
+	end
 
 	switch scenario
 		case 'seasonal',      melt_factor=1; melt_elevation=900;  firn_factor=0;
@@ -54,13 +64,12 @@ for i=1:numel(scenarios)
 	md.hydrology.moulin_input(pos)=firn_factor*50e6/md.constants.yts/numel(pos);
 
 	% Specify that you want to run the model on your current computer
-	% Change the number of processors according to your machine (here np=2)
 	md.cluster=generic('np',np);
 
-	md.miscellaneous.name=['Helheim_' scenario];
+	md.miscellaneous.name=['Helheim_' scenario '_' resolution];
 	md.verbose.solution=1;
 	md=solve(md,'Transient');
 
-	save(['Helheim_' scenario],'md','-v7.3');
+	save(['Helheim_' scenario '_' resolution],'md','-v7.3');
 end
 

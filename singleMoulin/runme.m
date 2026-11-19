@@ -1,5 +1,9 @@
 steps=[1:3];
 
+% Number of processors: change it according to your machine, or set np before
+% running this script (as run/runTestCases.m does)
+if ~exist('np','var'), np=2; end
+
 if any(steps==1) 
 	disp('	Step 1: Mesh');
 
@@ -63,8 +67,7 @@ if any(steps==3)
 	md.transient.ishydrology=1;
 
 	% Specify that you want to run the model on your current computer
-	% Change the number of processors according to your machine (here np=4)
-	md.cluster=generic('np',2);
+	md.cluster=generic('np',np);
 
 	% Define the time stepping scheme: run for 90 days with a time step of 1 hr
 	md.timestepping.time_step=3600/md.constants.yts; % Time step (in years)

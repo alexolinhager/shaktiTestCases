@@ -14,12 +14,16 @@
 % Input files:
 %    Thwaites_SHAKTI_init.mat   mesh, mask, geometry, ice velocity, friction and
 %                               geothermal flux (see md.miscellaneous.notes)
+%    Thwaites_SHAKTI_init_500mto10km.mat   the same on a coarser mesh
 %    TIS_island.exp             outline of the island that pins the ice shelf
+%
+% Output files end with the resolution: ThwaitesSpinup_<resolution>.mat,
+% ThwaitesCapacity_<resolution>.mat, Thwaites_<experiment>_<resolution>.mat
 
 steps=[1:3];
 
 % Experiments to run one after the other, each one starts from the end of the
-% spin-up and is saved in Thwaites_<experiment>.mat:
+% spin-up and is saved in Thwaites_<experiment>_<resolution>.mat:
 %    'control'  no intervention
 %    'pump'     water removed at the sites below
 %    'inject'   water added at the sites below
@@ -31,7 +35,14 @@ pumpXY=[-1429020 -441873
         -1438900 -424922
         -1419150 -463010];
 pumpRadius=5e3;
-np = 2; % number of processors
+
+% Number of processors and mesh resolution: change them according to your
+% machine, or set np and resolution before running this script (as
+% run/runTestCases.m does)
+%    'low'   500 m to 10 km (12,690 vertices)
+%    'high'  mesh of the InterventionModeling runs (40,167 vertices)
+if ~exist('np','var'), np=2; end
+if ~exist('resolution','var'), resolution='low'; end
 
 % Step 2: the head is brought down to the bed over each site (or to a water
 % pressure of pumpPinFrac x overburden if pumpPinFrac > 0) over pumpRampYears,
@@ -51,7 +62,11 @@ rampYears=1;
 
 if any(steps==1)
 	disp('	Step 1: Spin-up');
-	md=loadmodel('Thwaites_SHAKTI_init_500mto10km');
+	switch resolution
+		case 'low',  md=loadmodel('Thwaites_SHAKTI_init_500mto10km');
+		case 'high', md=loadmodel('Thwaites_SHAKTI_init');
+		otherwise, error(['resolution ''' resolution ''' not supported']);
+	end
 
 	% Standalone SHAKTI: only solve for hydrology
 	md.transient=deactivateall(md.transient);
@@ -108,19 +123,18 @@ if any(steps==1)
 	md.settings.output_frequency=2*30;
 
 	% Specify that you want to run the model on your current computer
-	% Change the number of processors according to your machine (here np=2)
 	md.cluster=generic('np',np);
 
-	md.miscellaneous.name='ThwaitesSpinup';
+	md.miscellaneous.name=['ThwaitesSpinup_' resolution];
 	md.verbose.solution=1;
 	md=solve(md,'Transient');
 
-	save ThwaitesSpinup md -v7.3
+	save(['ThwaitesSpinup_' resolution],'md','-v7.3');
 end
 
 if any(steps==2)
 	disp('	Step 2: Capacity of each site');
-	md=loadmodel('ThwaitesSpinup');
+	md=loadmodel(['ThwaitesSpinup_' resolution]);
 	nv = md.mesh.numberofvertices;
 
 	% Start from the end of the spin-up
@@ -145,9 +159,9 @@ if any(steps==2)
 	md.timestepping.final_time = hydroPumpTestYears;
 	md.cluster = generic('np',np);
 	md = pumpPins(md, vtx, 0, pumpRampYears, hydroPumpTestYears, pumpPinFrac);
-	md.miscellaneous.name = 'ThwaitesCapacity';
+	md.miscellaneous.name = ['ThwaitesCapacity_' resolution];
 	md = solve(md,'Transient');
-	save ThwaitesCapacity md -v7.3
+	save(['ThwaitesCapacity_' resolution],'md','-v7.3');
 	% a solver failure returns whatever was saved before it; a capacity from that is meaningless, so stop here
 	Tall = md.results.TransientSolution;
 	tReached = max([Tall(arrayfun(@(st) ~isempty(st.time), Tall)).time]);
@@ -178,7 +192,7 @@ if any(steps==2)
 		if sum(w) > 0, w = w / sum(w); else, w = ones(numel(vtx{i}),1) / numel(vtx{i}); end
 		cap.weights{i} = w;
 	end
-	save ThwaitesCapacity_cap cap
+	save(['ThwaitesCapacity_cap_' resolution],'cap');
 
 	% D. report
 	fprintf('\nstep 2: pump capacity, %g yr (head held at pumpPinFrac = %g over each footprint after a %g yr ramp)\n', hydroPumpTestYears, pumpPinFrac, pumpRampYears);
@@ -193,7 +207,7 @@ if any(steps==3)
 	for k=1:numel(experiments)
 		experiment=experiments{k};
 		disp(['	Step 3: Experiment (' experiment ')']);
-		md=loadmodel('ThwaitesSpinup');
+		md=loadmodel(['ThwaitesSpinup_' resolution]);
 		nv = md.mesh.numberofvertices;
 
 		% Start from the end of the spin-up
@@ -228,7 +242,7 @@ if any(steps==3)
 			end
 
 			% B. discharges and per-vertex shares: a fraction of the step 2 capacity split by the capacity weights
-			capFile = 'ThwaitesCapacity_cap.mat';
+			capFile = ['ThwaitesCapacity_cap_' resolution '.mat'];
 			assert(isfile(capFile), 'step 3: needs the step 2 capacity file %s', capFile);
 			load(capFile, 'cap');
 			assert(isequal(cap.xy, pumpXY) && isequal(cap.radius, pumpRadius) && all(cellfun(@isequal, cap.vertices(:), vtx(:))), ...
@@ -265,10 +279,10 @@ if any(steps==3)
 		% since the spin-up
 		md.cluster=generic('np',np);
 
-		md.miscellaneous.name=['Thwaites_' experiment];
+		md.miscellaneous.name=['Thwaites_' experiment '_' resolution];
 		md=solve(md,'Transient');
 
-		save(['Thwaites_' experiment],'md','-v7.3');
+		save(['Thwaites_' experiment '_' resolution],'md','-v7.3');
 	end
 end
 
