@@ -1,14 +1,14 @@
 # shaktiTestCases
 
-Standard test cases for SHAKTI, the subglacial hydrology model of [ISSM](https://issmteam.github.io/ISSM-Documentation/). Each case runs SHAKTI on its own (the ice does not move or change) and comes in a MATLAB and a Python version.
+Standardized test cases for standalone SHAKTI. Supported through both of ISSM's MATLAB and a Python interfaces.
 
 ## Test cases
 
-| Case | What it runs | Source |
+| Case | Description | Source |
 |---|---|---|
-| `singleMoulin` | One moulin feeding 4 m³/s to the centre of a 1 km square under a 500 m thick tilted slab, for 30 days. A channel grows from the moulin to the outflow edge. | Sommers et al. ([2018](https://doi.org/10.5194/gmd-11-2955-2018)); it is the `shakti` example of ISSM |
-| `helheimSeasonal` | Helheim Glacier, Greenland, for 1 year from a winter state, with three meltwater scenarios: seasonal runoff, seasonal runoff plus firn aquifer drainage, and enhanced melt. | "Seasonal Hydrology Forcing" experiments of Sommers et al. ([2024](https://doi.org/10.1029/2024GL109168), section 2.4.1) |
-| `thwaitesInterventions` | Thwaites Glacier, Antarctica: a 5-year spin-up, a 5-year run that measures how much water each of three sites can give, then three 5-year experiments: control, pump (water removed at the sites) and inject (water added). | The author's coupled SHAKTI-ISSM intervention runs, on the model of Ehrenfeucht and Dow (2026) |
+| `singleMoulin` | One moulin feeding 4 m³/s to the centre of a 1 km square under a 500 m thick tilted slab, for 30 days. A channel grows from the moulin to the outflow edge. | Sommers et al. ([2018](https://doi.org/10.5194/gmd-11-2955-2018)); this is also the `shakti` example of ISSM |
+| `helheimSeasonal` | Helheim Glacier, Greenland, for 1 year from a winter state, with three meltwater scenarios: seasonal runoff, seasonal runoff plus firn aquifer drainage, and enhanced melt. | Standalone versions of the "Seasonal Hydrology Forcing" experiments in Sommers et al. ([2024](https://doi.org/10.1029/2024GL109168), section 2.4.1) |
+| `thwaitesInterventions` | Thwaites Glacier, Antarctica: a 5-year spin-up, a 5-year run measuring the maximum water extraction rate from three arbitrary pumps sites, then three 5-year experiments: control, pump (water removed at the sites) and inject (water added). | Simulations are run on a cropped domain of Ehrenfeucht et al. (2026) |
 
 Details that differ from the sources:
 
@@ -42,7 +42,7 @@ python runTestCases.py helheimSeasonal 8 ~/shaktiRuns high
 python runTestCases.py singleMoulin,thwaitesInterventions 2 ~/shaktiRuns
 ```
 
-Nothing is written in this repository. Each case runs in `<run directory>/<case>`, where its scripts and input files are copied first. If one case fails, the others still run.
+Each case runs in `<run directory>/<case>`, where its scripts and input files are copied first. If one case fails, the others still run.
 
 You can also run a `runme` and then a `diagnostics` script by hand in the folder of a case; the results are then written in that folder.
 
@@ -59,7 +59,7 @@ In `<run directory>/<case>`:
 
 - ISSM with SHAKTI, and the `ISSM_DIR` environment variable.
 - For Python: ISSM built with its Python interface, a version of ISSM from mid-November 2026 or later (`write_netCDF.py` has a syntax error in versions from 15 September to 12 November 2026), and the `netCDF4`, `scipy` and `matplotlib` packages. Videos are `.mp4` if `ffmpeg` or the `imageio-ffmpeg` package is installed, and `.gif` otherwise.
-
+- For water extraction experiments, it is possible to extract water so that the gap height falls below the minimum gap height. If this happens, the gap height will be held at its set minimum value, but the hydraulic head will not be updated, resulting in a break in mass conservation (water pressure could become negative because it appears there is more water to remove than actually exists). It is best to run these experiments with this commit, which fixes this issue: https://github.com/ISSMteam/ISSM/commit/391c9d10236a9cad10287fb240048dc1796ab8d7
 ## Water extraction with the Python interface
 
 As of November 2026, the Python interface of ISSM refuses a negative `moulin_input`, so the `pump` experiment of `thwaitesInterventions` stops with "Model not consistent". The MATLAB interface accepts it.
